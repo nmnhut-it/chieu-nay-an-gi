@@ -1,0 +1,827 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🍽️ Chiều Nay Ăn Gì?</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        h1 {
+            color: white;
+            text-align: center;
+            margin-bottom: 20px;
+            font-size: clamp(1.5rem, 5vw, 2.5rem);
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .container {
+            width: 100%;
+            max-width: 500px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .wheel-container {
+            position: relative;
+            width: min(320px, 85vw);
+            height: min(320px, 85vw);
+        }
+
+        .pointer {
+            position: absolute;
+            top: -10px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 0;
+            height: 0;
+            border-left: 18px solid transparent;
+            border-right: 18px solid transparent;
+            border-top: 35px solid #ff6b6b;
+            z-index: 10;
+            filter: drop-shadow(0 4px 6px rgba(0,0,0,0.3));
+        }
+
+        .wheel-wrapper {
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.4);
+            border: 8px solid white;
+            overflow: hidden;
+            background: #333;
+        }
+
+        #wheelCanvas {
+            width: 100%;
+            height: 100%;
+        }
+
+        .wheel-wrapper.spinning {
+            animation: wheelGlow 0.5s ease-in-out infinite alternate;
+        }
+
+        @keyframes wheelGlow {
+            0% { box-shadow: 0 10px 30px rgba(0,0,0,0.4), 0 0 20px rgba(255,107,107,0.3); }
+            100% { box-shadow: 0 10px 30px rgba(0,0,0,0.4), 0 0 40px rgba(255,107,107,0.6); }
+        }
+
+        .pointer.bounce {
+            animation: pointerBounce 0.1s ease;
+        }
+
+        @keyframes pointerBounce {
+            0%, 100% { transform: translateX(-50%) rotate(0deg); }
+            50% { transform: translateX(-50%) rotate(5deg); }
+        }
+
+        .spin-btn {
+            background: linear-gradient(145deg, #ff6b6b, #ee5a5a);
+            color: white;
+            border: none;
+            padding: 15px 50px;
+            font-size: 1.3rem;
+            font-weight: bold;
+            border-radius: 50px;
+            cursor: pointer;
+            box-shadow: 0 8px 20px rgba(255,107,107,0.4);
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+
+        .spin-btn:hover:not(:disabled) {
+            transform: translateY(-3px);
+            box-shadow: 0 12px 25px rgba(255,107,107,0.5);
+        }
+
+        .spin-btn:disabled {
+            background: #999;
+            cursor: not-allowed;
+            box-shadow: none;
+        }
+
+        .result {
+            background: white;
+            padding: 20px 30px;
+            border-radius: 15px;
+            text-align: center;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            display: none;
+            animation: popIn 0.5s ease;
+        }
+
+        .result.show {
+            display: block;
+        }
+
+        @keyframes popIn {
+            0% { transform: scale(0.5); opacity: 0; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+
+        .result h2 {
+            color: #764ba2;
+            font-size: 1.5rem;
+            margin-bottom: 5px;
+        }
+
+        .result p {
+            color: #666;
+            font-size: 1rem;
+        }
+
+        .options-panel {
+            width: 100%;
+            background: white;
+            border-radius: 20px;
+            padding: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+
+        .options-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+            cursor: pointer;
+            user-select: none;
+        }
+
+        .options-header h3 {
+            color: #764ba2;
+            font-size: 1.1rem;
+        }
+
+        .toggle-icon {
+            font-size: 1.5rem;
+            transition: transform 0.3s ease;
+        }
+
+        .options-header.collapsed .toggle-icon {
+            transform: rotate(180deg);
+        }
+
+        .options-content {
+            max-height: 350px;
+            overflow: hidden;
+            transition: max-height 0.3s ease;
+        }
+
+        .options-content.hidden {
+            max-height: 0;
+        }
+
+        .add-form {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        .add-form input {
+            flex: 1;
+            padding: 12px 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            font-size: 1rem;
+            transition: border-color 0.3s ease;
+        }
+
+        .add-form input:focus {
+            outline: none;
+            border-color: #764ba2;
+        }
+
+        .add-btn {
+            background: #4CAF50;
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            border-radius: 10px;
+            font-size: 1.2rem;
+            cursor: pointer;
+            transition: background 0.3s ease;
+        }
+
+        .add-btn:hover {
+            background: #45a049;
+        }
+
+        .options-list {
+            list-style: none;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+
+        .option-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 15px;
+            background: #f8f9fa;
+            border-radius: 10px;
+            margin-bottom: 8px;
+            transition: all 0.3s ease;
+        }
+
+        .option-item:hover {
+            background: #e9ecef;
+        }
+
+        .option-name {
+            font-weight: 500;
+            color: #333;
+            flex: 1;
+        }
+
+        .option-actions {
+            display: flex;
+            gap: 8px;
+        }
+
+        .option-actions button {
+            border: none;
+            padding: 8px 12px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            transition: all 0.3s ease;
+        }
+
+        .edit-btn {
+            background: #ffc107;
+            color: #333;
+        }
+
+        .edit-btn:hover {
+            background: #e0a800;
+        }
+
+        .delete-btn {
+            background: #dc3545;
+            color: white;
+        }
+
+        .delete-btn:hover {
+            background: #c82333;
+        }
+
+        .edit-input {
+            flex: 1;
+            padding: 8px 12px;
+            border: 2px solid #764ba2;
+            border-radius: 8px;
+            font-size: 0.95rem;
+        }
+
+        .save-btn {
+            background: #28a745;
+            color: white;
+        }
+
+        .save-btn:hover {
+            background: #218838;
+        }
+
+        .cancel-btn {
+            background: #6c757d;
+            color: white;
+        }
+
+        .cancel-btn:hover {
+            background: #5a6268;
+        }
+
+        .share-section {
+            width: 100%;
+            text-align: center;
+            margin-top: 10px;
+        }
+
+        .share-btn {
+            background: linear-gradient(145deg, #25D366, #128C7E);
+            color: white;
+            border: none;
+            padding: 12px 25px;
+            border-radius: 25px;
+            font-size: 1rem;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.3s ease;
+        }
+
+        .share-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(37,211,102,0.4);
+        }
+
+        .confetti {
+            position: fixed;
+            width: 10px;
+            height: 10px;
+            pointer-events: none;
+            animation: confettiFall 3s ease-out forwards;
+        }
+
+        @keyframes confettiFall {
+            0% {
+                transform: translateY(-100vh) rotate(0deg);
+                opacity: 1;
+            }
+            100% {
+                transform: translateY(100vh) rotate(720deg);
+                opacity: 0;
+            }
+        }
+
+        @media (max-width: 400px) {
+            .add-form {
+                flex-direction: column;
+            }
+            
+            .add-btn {
+                width: 100%;
+            }
+            
+            .option-item {
+                flex-direction: column;
+                gap: 10px;
+                align-items: stretch;
+            }
+            
+            .option-actions {
+                justify-content: flex-end;
+            }
+        }
+    </style>
+</head>
+<body>
+    <h1>🍽️ Chiều Nay Ăn Gì?</h1>
+    
+    <div class="container">
+        <div class="wheel-container">
+            <div class="pointer"></div>
+            <div class="wheel-wrapper">
+                <canvas id="wheelCanvas" width="600" height="600"></canvas>
+            </div>
+        </div>
+
+        <button class="spin-btn" id="spinBtn" onclick="spin()">🎰 QUAY!</button>
+
+        <div class="result" id="result">
+            <h2 id="resultText">🎉 Kết quả!</h2>
+            <p>Hôm nay đi ăn đây nè!</p>
+        </div>
+
+        <div class="options-panel">
+            <div class="options-header" onclick="toggleOptions()">
+                <h3>📝 Danh sách món ăn</h3>
+                <span class="toggle-icon">▼</span>
+            </div>
+            <div class="options-content" id="optionsContent">
+                <div class="add-form">
+                    <input type="text" id="newOption" placeholder="Thêm món mới..." onkeypress="handleKeyPress(event)">
+                    <button class="add-btn" onclick="addOption()">➕</button>
+                </div>
+                <ul class="options-list" id="optionsList"></ul>
+            </div>
+        </div>
+
+        <div class="share-section">
+            <button class="share-btn" onclick="shareResult()">
+                📤 Chia sẻ với bạn bè
+            </button>
+        </div>
+    </div>
+
+    <script>
+        const colors = [
+            '#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', 
+            '#FFEAA7', '#DDA0DD', '#98D8C8', '#F7DC6F',
+            '#BB8FCE', '#85C1E9', '#F8B500', '#00CED1',
+            '#FF7F50', '#9370DB', '#3CB371', '#FFB6C1'
+        ];
+
+        let options = [
+            'Nướng Shogun',
+            'Nướng Gogi',
+            'Lẩu Kichi',
+            'Lẩu Manwah',
+            'Món Thái',
+            'Cloud Pot (Hấp)',
+            'Longwan (Hấp)',
+            'Cuốn',
+            'Pizza'
+        ];
+
+        let isSpinning = false;
+        let currentRotation = 0;
+        let highlightedSegment = -1; // Segment currently under pointer
+        const canvas = document.getElementById('wheelCanvas');
+        const ctx = canvas.getContext('2d');
+
+        // Get actual rotation angle from canvas transform matrix
+        function getActualRotation() {
+            const style = window.getComputedStyle(canvas);
+            const transform = style.transform;
+            if (transform === 'none') return 0;
+
+            // Parse matrix(a, b, c, d, tx, ty)
+            const values = transform.match(/matrix\(([^)]+)\)/);
+            if (!values) return 0;
+
+            const parts = values[1].split(',').map(Number);
+            const a = parts[0];
+            const b = parts[1];
+            // atan2(b, a) gives rotation in radians
+            const radians = Math.atan2(b, a);
+            let degrees = radians * (180 / Math.PI);
+            // Normalize to 0-360
+            return ((degrees % 360) + 360) % 360;
+        }
+
+        // Get which segment is under the pointer
+        function getSegmentAtPointer() {
+            const rotation = getActualRotation();
+            const segmentAngle = 360 / options.length;
+            // Based on testing: rotation 55° should give Cuốn (index 7)
+            // idx = floor(55/40) = 1, need result = 7 = (9 - 2) % 9
+            // So formula: (n - idx - 1) % n, or equivalently (n - 1 - idx) % n
+            const idx = Math.floor(rotation / segmentAngle);
+            return (options.length - 1 - idx + options.length) % options.length;
+        }
+
+        function drawWheel(highlighted = -1) {
+            const centerX = canvas.width / 2;
+            const centerY = canvas.height / 2;
+            const radius = Math.min(centerX, centerY) - 5;
+            
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            const segmentAngle = (2 * Math.PI) / options.length;
+            
+            options.forEach((option, index) => {
+                const startAngle = index * segmentAngle - Math.PI / 2;
+                const endAngle = startAngle + segmentAngle;
+
+                // Draw segment
+                ctx.beginPath();
+                ctx.moveTo(centerX, centerY);
+                ctx.arc(centerX, centerY, radius, startAngle, endAngle);
+                ctx.closePath();
+
+                // Highlight if this segment is under pointer
+                if (index === highlighted) {
+                    ctx.fillStyle = '#FFD700'; // Gold highlight
+                } else {
+                    ctx.fillStyle = colors[index % colors.length];
+                }
+                ctx.fill();
+                
+                // Draw border
+                ctx.strokeStyle = '#fff';
+                ctx.lineWidth = 3;
+                ctx.stroke();
+                
+                // Draw text
+                ctx.save();
+                ctx.translate(centerX, centerY);
+                ctx.rotate(startAngle + segmentAngle / 2);
+                ctx.textAlign = 'right';
+                ctx.textBaseline = 'middle';
+                ctx.fillStyle = '#fff';
+                ctx.font = 'bold 24px Segoe UI, sans-serif';
+                ctx.shadowColor = 'rgba(0,0,0,0.5)';
+                ctx.shadowBlur = 4;
+                ctx.shadowOffsetX = 2;
+                ctx.shadowOffsetY = 2;
+                
+                // Truncate text if too long
+                let text = option;
+                const maxWidth = radius - 40;
+                while (ctx.measureText(text).width > maxWidth && text.length > 3) {
+                    text = text.slice(0, -1);
+                }
+                if (text !== option) text += '…';
+                
+                ctx.fillText(text, radius - 20, 0);
+                ctx.restore();
+            });
+            
+            // Draw center circle
+            ctx.beginPath();
+            ctx.arc(centerX, centerY, 25, 0, 2 * Math.PI);
+            ctx.fillStyle = '#fff';
+            ctx.fill();
+            ctx.strokeStyle = '#764ba2';
+            ctx.lineWidth = 4;
+            ctx.stroke();
+        }
+
+        // Audio context for tick sounds
+        let audioCtx = null;
+
+        function initAudio() {
+            if (!audioCtx) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            }
+        }
+
+        function playTick(volume = 0.3) {
+            if (!audioCtx) return;
+            const oscillator = audioCtx.createOscillator();
+            const gainNode = audioCtx.createGain();
+            oscillator.connect(gainNode);
+            gainNode.connect(audioCtx.destination);
+            oscillator.frequency.value = 800 + Math.random() * 400;
+            oscillator.type = 'sine';
+            gainNode.gain.setValueAtTime(volume, audioCtx.currentTime);
+            gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.05);
+            oscillator.start(audioCtx.currentTime);
+            oscillator.stop(audioCtx.currentTime + 0.05);
+        }
+
+        function playWinSound() {
+            if (!audioCtx) return;
+            const notes = [523, 659, 784, 1047]; // C5, E5, G5, C6
+            notes.forEach((freq, i) => {
+                setTimeout(() => {
+                    const osc = audioCtx.createOscillator();
+                    const gain = audioCtx.createGain();
+                    osc.connect(gain);
+                    gain.connect(audioCtx.destination);
+                    osc.frequency.value = freq;
+                    osc.type = 'sine';
+                    gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.3);
+                    osc.start(audioCtx.currentTime);
+                    osc.stop(audioCtx.currentTime + 0.3);
+                }, i * 100);
+            });
+        }
+
+        function spin() {
+            if (isSpinning || options.length < 2) return;
+
+            initAudio();
+            isSpinning = true;
+            const spinBtn = document.getElementById('spinBtn');
+            const wheelWrapper = document.querySelector('.wheel-wrapper');
+            const pointer = document.querySelector('.pointer');
+            spinBtn.disabled = true;
+
+            document.getElementById('result').classList.remove('show');
+            wheelWrapper.classList.add('spinning');
+
+            // Animation parameters
+            const segmentAngle = 360 / options.length;
+            const totalSpins = (Math.random() * 4 + 8) * 360; // 8-12 full rotations
+            const targetOffset = Math.random() * 360;
+            const finalRotation = currentRotation + totalSpins + targetOffset;
+
+            const duration = 7000; // 7 seconds total
+            const startTime = performance.now();
+            const startRotation = currentRotation;
+            let lastSegment = -1;
+
+            // Smooth easing: fast start, dramatic slow ending
+            function spinEasing(t) {
+                // Combination of quick acceleration + very slow deceleration
+                // 1 - (1-t)^5 gives smooth curve that slows dramatically at end
+                const base = 1 - Math.pow(1 - t, 5);
+
+                // Add extra slowdown in final 20% for suspense
+                if (t > 0.8) {
+                    const extra = (t - 0.8) / 0.2;
+                    // Blend to even slower curve at the end
+                    const slowEnd = 1 - Math.pow(1 - t, 8);
+                    return base * (1 - extra) + slowEnd * extra;
+                }
+                return base;
+            }
+
+            function animate(currentTime) {
+                const elapsed = currentTime - startTime;
+                const progress = Math.min(elapsed / duration, 1);
+                const easedProgress = spinEasing(progress);
+
+                const rotation = startRotation + (finalRotation - startRotation) * easedProgress;
+                canvas.style.transform = `rotate(${rotation}deg)`;
+
+                // Detect segment change for tick sound (based on rotation amount)
+                const rotationFromStart = rotation - startRotation;
+                const segmentsPassed = Math.floor(rotationFromStart / segmentAngle);
+
+                if (segmentsPassed !== lastSegment) {
+                    lastSegment = segmentsPassed;
+                    // Volume decreases as wheel slows
+                    const volume = 0.1 + (1 - progress) * 0.3;
+                    playTick(volume);
+
+                    // Bounce the pointer
+                    pointer.classList.remove('bounce');
+                    void pointer.offsetWidth; // Trigger reflow
+                    pointer.classList.add('bounce');
+                }
+
+                if (progress < 1) {
+                    requestAnimationFrame(animate);
+                } else {
+                    // Spin complete
+                    currentRotation = finalRotation;
+                    wheelWrapper.classList.remove('spinning');
+
+                    // Get winner based on actual canvas rotation
+                    const actualRotation = getActualRotation();
+                    const winningIndex = getSegmentAtPointer();
+                    const winner = options[winningIndex];
+
+                    // Debug: log to verify
+                    console.log('Actual rotation from matrix:', actualRotation, 'deg');
+                    console.log('Winning index:', winningIndex, '=', winner);
+
+                    // Dramatic pause before reveal
+                    setTimeout(() => {
+                        playWinSound();
+                        showResult(winner);
+                        createConfetti();
+                        isSpinning = false;
+                        spinBtn.disabled = false;
+                    }, 500);
+                }
+            }
+
+            requestAnimationFrame(animate);
+        }
+
+        function showResult(winner) {
+            const result = document.getElementById('result');
+            document.getElementById('resultText').textContent = `🎉 ${winner}`;
+            result.classList.add('show');
+        }
+
+        function createConfetti() {
+            const confettiColors = ['#FF6B6B', '#4ECDC4', '#45B7D1', '#FFEAA7', '#DDA0DD', '#F7DC6F'];
+            
+            for (let i = 0; i < 50; i++) {
+                setTimeout(() => {
+                    const confetti = document.createElement('div');
+                    confetti.className = 'confetti';
+                    confetti.style.left = Math.random() * 100 + 'vw';
+                    confetti.style.background = confettiColors[Math.floor(Math.random() * confettiColors.length)];
+                    confetti.style.borderRadius = Math.random() > 0.5 ? '50%' : '0';
+                    confetti.style.width = (Math.random() * 10 + 5) + 'px';
+                    confetti.style.height = (Math.random() * 10 + 5) + 'px';
+                    document.body.appendChild(confetti);
+                    
+                    setTimeout(() => confetti.remove(), 3000);
+                }, i * 30);
+            }
+        }
+
+        function renderOptionsList() {
+            const list = document.getElementById('optionsList');
+            list.innerHTML = '';
+            
+            options.forEach((option, index) => {
+                const li = document.createElement('li');
+                li.className = 'option-item';
+                li.innerHTML = `
+                    <span class="option-name">${option}</span>
+                    <div class="option-actions">
+                        <button class="edit-btn" onclick="editOption(${index})">✏️</button>
+                        <button class="delete-btn" onclick="deleteOption(${index})">🗑️</button>
+                    </div>
+                `;
+                list.appendChild(li);
+            });
+            
+            drawWheel();
+            saveToLocalStorage();
+        }
+
+        function addOption() {
+            const input = document.getElementById('newOption');
+            const value = input.value.trim();
+            
+            if (value && !options.includes(value)) {
+                options.push(value);
+                input.value = '';
+                renderOptionsList();
+            }
+        }
+
+        function handleKeyPress(event) {
+            if (event.key === 'Enter') {
+                addOption();
+            }
+        }
+
+        function editOption(index) {
+            const list = document.getElementById('optionsList');
+            const li = list.children[index];
+            const currentValue = options[index];
+            
+            li.innerHTML = `
+                <input type="text" class="edit-input" value="${currentValue}" id="editInput${index}">
+                <div class="option-actions">
+                    <button class="save-btn" onclick="saveEdit(${index})">💾</button>
+                    <button class="cancel-btn" onclick="renderOptionsList()">❌</button>
+                </div>
+            `;
+            
+            const editInput = document.getElementById(`editInput${index}`);
+            editInput.focus();
+            editInput.select();
+            editInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') saveEdit(index);
+            });
+        }
+
+        function saveEdit(index) {
+            const input = document.getElementById(`editInput${index}`);
+            const value = input.value.trim();
+            
+            if (value) {
+                options[index] = value;
+                renderOptionsList();
+            }
+        }
+
+        function deleteOption(index) {
+            if (options.length > 2) {
+                options.splice(index, 1);
+                renderOptionsList();
+            } else {
+                alert('Cần ít nhất 2 món để quay số! 😅');
+            }
+        }
+
+        function toggleOptions() {
+            const content = document.getElementById('optionsContent');
+            const header = document.querySelector('.options-header');
+            content.classList.toggle('hidden');
+            header.classList.toggle('collapsed');
+        }
+
+        function saveToLocalStorage() {
+            localStorage.setItem('wheelOfFoodOptions', JSON.stringify(options));
+        }
+
+        function loadFromLocalStorage() {
+            const saved = localStorage.getItem('wheelOfFoodOptions');
+            if (saved) {
+                try {
+                    const parsed = JSON.parse(saved);
+                    if (Array.isArray(parsed) && parsed.length >= 2) {
+                        options = parsed;
+                    }
+                } catch (e) {
+                    console.log('Could not load saved options');
+                }
+            }
+        }
+
+        function shareResult() {
+            const resultText = document.getElementById('resultText').textContent;
+            const shareText = resultText.includes('🎉') 
+                ? `Vòng quay đã chọn: ${resultText}\n\nQuay thử xem chiều nay ăn gì nè! 🍽️`
+                : `Thử vòng quay xem chiều nay ăn gì nè! 🍽️`;
+            
+            if (navigator.share) {
+                navigator.share({
+                    title: 'Chiều Nay Ăn Gì?',
+                    text: shareText,
+                    url: window.location.href
+                }).catch(console.error);
+            } else {
+                navigator.clipboard.writeText(shareText + '\n' + window.location.href)
+                    .then(() => alert('Đã copy link! Gửi cho bạn bè thôi 🎉'))
+                    .catch(() => alert('Không thể chia sẻ 😅'));
+            }
+        }
+
+        // Initialize
+        loadFromLocalStorage();
+        renderOptionsList();
+    </script>
+</body>
+</html>
